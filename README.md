@@ -2,7 +2,7 @@
 
 OpenAI-compatible TTS wrapper for **Fish Audio S2 Pro GGUF**, built for Pandrator-style workflows.
 
-This server keeps the same endpoint shape used by our XTTS/Vox wrappers while running inference through `s2.dll` from FishS2Sharp runtime bundles (which wrap the local `s2.cpp` runtime).
+This server keeps the same endpoint shape used by our XTTS-style wrappers while running inference through `s2.dll` from FishS2Sharp runtime bundles (which wrap the local `s2.cpp` runtime).
 
 ## Upstream Sources
 
@@ -112,6 +112,107 @@ For Fish/S2, what matters is whether a reference audio is provided, and if so, a
 ### Output Format
 
 V1 supports **`wav` only**.
+
+## Practical API Examples
+
+Assume server is running at `http://127.0.0.1:8020`.
+
+### 1) Health and model discovery
+
+```bash
+curl http://127.0.0.1:8020/health
+curl http://127.0.0.1:8020/v1/models
+```
+
+### 2) Basic generation (default/random voice)
+
+```bash
+curl -X POST http://127.0.0.1:8020/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "fishs2",
+    "input": "Hello from Fish S2 CPP FastAPI.",
+    "voice": "default",
+    "response_format": "wav"
+  }' \
+  --output outputs/basic.wav
+```
+
+### 3) Upload a voice profile (stored under `voices/<voice_id>/`)
+
+```bash
+curl -X POST http://127.0.0.1:8020/v1/audio/voices \
+  -F "files=@voices/sample_male/sample_male_new.wav" \
+  -F "voice_id=sample_male" \
+  -F "prompt_text=This is a sample transcript for the reference clip."
+```
+
+List stored voices:
+
+```bash
+curl http://127.0.0.1:8020/v1/audio/voices
+```
+
+### 4) Generate speech using a stored voice profile
+
+```bash
+curl -X POST http://127.0.0.1:8020/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "fishs2",
+    "input": "This line uses the uploaded sample_male profile.",
+    "voice": "sample_male",
+    "response_format": "wav"
+  }' \
+  --output outputs/from_profile.wav
+```
+
+### 5) Direct one-off cloning with explicit reference audio + transcript
+
+`reference_audio` is a local file path on the server machine.
+
+```bash
+curl -X POST http://127.0.0.1:8020/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "fishs2",
+    "input": "This line clones directly from a reference file.",
+    "voice": "default",
+    "reference_audio": "voices/sample_male/sample_male_new.wav",
+    "reference_text": "This is a sample transcript for the reference clip.",
+    "response_format": "wav"
+  }' \
+  --output outputs/direct_clone.wav
+```
+
+### 6) Advanced generation controls (`fishs2` overrides)
+
+```bash
+curl -X POST http://127.0.0.1:8020/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "fishs2",
+    "input": "Custom sampling settings example.",
+    "voice": "sample_male",
+    "response_format": "wav",
+    "fishs2": {
+      "max_new_tokens": 900,
+      "temperature": 0.7,
+      "top_p": 0.85,
+      "top_k": 40,
+      "min_tokens_before_end": 0,
+      "n_threads": 0,
+      "verbose": true
+    }
+  }' \
+  --output outputs/custom_params.wav
+```
+
+### 7) Delete an uploaded voice profile
+
+```bash
+curl -X DELETE http://127.0.0.1:8020/v1/voices/sample_male
+```
 
 ## Voice Upload Notes
 
