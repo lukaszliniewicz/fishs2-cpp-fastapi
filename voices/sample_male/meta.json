@@ -1,0 +1,14 @@
+{
+  "voice_id": "sample_male",
+  "created": 1779234432,
+  "model": null,
+  "language": null,
+  "mode": "hifi",
+  "prompt_text": "The window was open, granted, but the room is on the second floor. Anyway, you may dismiss the window. I remember the old lady saying there was a bar across it, and that nobody could have squeezed through.",
+  "files": [
+    {
+      "filename": "sample_male_new.wav",
+      "size": 557756
+    }
+  ]
+}

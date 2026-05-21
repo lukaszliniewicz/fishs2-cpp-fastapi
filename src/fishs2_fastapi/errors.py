@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+from fastapi.responses import JSONResponse
+
+
+class APIError(Exception):
+    def __init__(self, message: str, param: str | None = None, code: str | None = None, status: int = 400):
+        self.message = message
+        self.param = param
+        self.code = code
+        self.status = status
+
+    def to_response(self) -> JSONResponse:
+        body = {
+            "error": {
+                "message": self.message,
+                "type": "invalid_request_error",
+                "param": self.param,
+                "code": self.code or "invalid_request_error",
+            }
+        }
+        return JSONResponse(body, status_code=self.status)
+
+
+def unknown_model(model_id: str) -> APIError:
+    return APIError(f"Model '{model_id}' not found", param="model", code="model_not_found", status=404)
+
+
+def unknown_voice(voice_id: str) -> APIError:
+    return APIError(f"Voice '{voice_id}' not found", param="voice", code="voice_not_found", status=404)
+
+
+def invalid_reference_audio(path: str) -> APIError:
+    return APIError(
+        f"Reference audio could not be read: {path}",
+        param="reference_audio",
+        code="invalid_reference_audio",
+        status=422,
+    )
+
+
+def reference_audio_too_short(path: str, duration: float, min_seconds: float) -> APIError:
+    return APIError(
+        (
+            f"Reference audio is too short: {path} "
+            f"({duration:.3f}s, minimum {min_seconds:.3f}s)"
+        ),
+        param="reference_audio",
+        code="reference_audio_too_short",
+        status=422,
+    )

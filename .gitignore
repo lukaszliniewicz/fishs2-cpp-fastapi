@@ -1,0 +1,64 @@
+# pixi
+.pixi/
+.pixi-cache/
+.pip-cache/
+*.lock
+
+# models
+models/*/
+models/*.gguf
+models/tokenizer.json
+
+# runtime artifacts
+runtime/
+
+# local huggingface cache
+.hf/
+.cache/
+
+# voices
+voices/*/
+!voices/sample_male/
+voices/sample_male/*
+!voices/sample_male/sample_male_new.wav
+!voices/sample_male/meta.json
+
+# files
+files/*/
+
+# binaries
+bin/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# env
+.env
+.envrc
+.env.example
+
+# logs
+*.log
+
+# temp
+tmp/
+.tmp/
+outputs/
+generations/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# local plans / notes
+PLAN.md
+*PLAN.md
+*.plan.md
