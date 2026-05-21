@@ -238,7 +238,26 @@ When using a stored voice for synthesis, the first uploaded audio sample is used
 - `run.py` blocks startup when `--backend cuda` is selected and no NVIDIA GPU is detected.
 - To bypass this check intentionally, use `--skip-gpu-check` (or set `FISHS2_SKIP_GPU_CHECK=true`).
 - On Windows, the runtime must be able to load CUDA dependencies (`nvcuda.dll`, `cudart64_12.dll`, `cublas64_12.dll`).
+- The Windows pixi environment pins `cuda-cudart` and `libcublas` from conda-forge to provide `cudart64_12.dll` and `cublas64_12.dll` inside the env.
 - `FISHS2_N_GPU_LAYERS` controls transformer GPU offload (`-1` keeps runtime default behavior, typically full offload on GPU backends).
+
+If you hit `Failed loading s2.dll or one of its dependencies`:
+
+1. Re-run bootstrap with fresh artifacts:
+
+```bash
+python run.py --force-downloads
+```
+
+2. Verify runtime files exist under `runtime/fishs2sharp/`, especially:
+   - `s2.dll`
+   - `ggml-base.dll`
+   - `ggml.dll`
+   - `ggml-cpu.dll`
+   - `FishS2Sharp.dll`
+   - and `ggml-cuda.dll` when using CUDA backend
+
+3. Ensure CUDA runtime libraries are available to the process (`cudart64_12.dll`, `cublas64_12.dll`).
 
 ## Local Cache Policy
 
@@ -247,9 +266,12 @@ The bootstrapper forces local, portable cache locations inside this repo:
 - `.hf/` for Hugging Face caches (`HF_HOME`, `HF_HUB_CACHE`, `TRANSFORMERS_CACHE`, etc.)
 - `.pip-cache/` for pip
 - `.pixi-cache/` for pixi
+- `.pixi-cache/rattler/` for rattler package cache (`RATTLER_CACHE_DIR`)
 - `.tmp/` for temporary downloads
 
 This prevents fallback to user-global cache folders on the host machine.
+
+`run.bat` and `run.sh` now export these cache overrides before `pixi install`, so first-time environment setup stays local too.
 
 Optional DLL search path overrides:
 

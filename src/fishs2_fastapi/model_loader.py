@@ -209,6 +209,50 @@ def bootstrap_dll_search_paths(runtime_dir: Path) -> None:
             _ADDED_DLL_DIRS.add(key)
 
 
+def _preload_runtime_dependencies(*, runtime_dir: Path, backend: str) -> None:
+    if platform.system() != "Windows":
+        return
+
+    required_local = [
+        "ggml-base.dll",
+        "ggml.dll",
+        "ggml-cpu.dll",
+        "FishS2Sharp.dll",
+    ]
+    if backend == "cuda":
+        required_local.append("ggml-cuda.dll")
+    elif backend == "vulkan":
+        required_local.append("ggml-vulkan.dll")
+
+    for dll_name in required_local:
+        dll_path = runtime_dir / dll_name
+        if not dll_path.is_file():
+            raise S2RuntimeUnavailable(
+                f"Runtime dependency '{dll_name}' not found at '{dll_path}'. "
+                "Re-run bootstrap with --force-downloads (or set FISHS2_FORCE_DOWNLOADS=true)."
+            )
+
+        try:
+            ctypes.WinDLL(str(dll_path))
+        except OSError as exc:
+            raise S2RuntimeUnavailable(
+                f"Failed loading runtime dependency '{dll_name}' from '{dll_path}'. "
+                "Ensure FishS2 runtime files are complete and Visual C++ redistributables are installed. "
+                f"Details: {exc}"
+            ) from exc
+
+    if backend == "cuda":
+        for dll_name in ("cudart64_12.dll", "cublas64_12.dll"):
+            try:
+                ctypes.WinDLL(dll_name)
+            except OSError as exc:
+                raise S2RuntimeUnavailable(
+                    f"CUDA runtime dependency '{dll_name}' could not be loaded. "
+                    "Install CUDA runtime libraries (or ensure your environment exposes them) and retry. "
+                    f"Details: {exc}"
+                ) from exc
+
+
 def _cstring(value: str) -> bytes:
     return value.encode("utf-8")
 
@@ -230,6 +274,7 @@ class _S2Native:
             raise S2RuntimeUnavailable(
                 "Failed loading s2.dll or one of its dependencies. "
                 "Ensure FishS2Sharp runtime DLLs and CUDA runtime libraries are available. "
+                "If needed, re-download runtime artifacts with --force-downloads. "
                 f"Details: {exc}"
             ) from exc
 
@@ -382,6 +427,7 @@ class S2Runtime:
             runtime_dir = dll_path.parent
 
             bootstrap_dll_search_paths(runtime_dir)
+            _preload_runtime_dependencies(runtime_dir=runtime_dir, backend=self.backend)
             native = _S2Native(dll_path)
 
             backend_id = self._backend_id()

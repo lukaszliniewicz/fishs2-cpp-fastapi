@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import fishs2_fastapi.model_loader as model_loader
+import pytest
 
 
 def _fake_native_class(*, with_shared_init: bool, with_gpu_layer_export: bool):
@@ -149,6 +150,7 @@ def _patch_runtime_dependencies(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(model_loader, "_resolve_artifact_path", _resolve_artifact_path)
     monkeypatch.setattr(model_loader, "resolve_s2_dll_path", lambda: dll_file)
     monkeypatch.setattr(model_loader, "bootstrap_dll_search_paths", lambda runtime_dir: None)
+    monkeypatch.setattr(model_loader.platform, "system", lambda: "Linux")
     monkeypatch.setattr(model_loader.settings, "backend", "cpu")
     monkeypatch.setattr(model_loader.settings, "gpu_device", 0)
 
@@ -205,3 +207,40 @@ def test_runtime_uses_shared_init_when_n_gpu_layers_auto(monkeypatch, tmp_path):
     assert ("model_with_layers", -1) not in runtime._native.calls
 
     runtime.close()
+
+
+def test_preload_runtime_dependencies_requires_ggml_base(monkeypatch, tmp_path):
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+
+    for name in ("ggml.dll", "ggml-cpu.dll", "FishS2Sharp.dll"):
+        (runtime_dir / name).write_bytes(b"x")
+
+    monkeypatch.setattr(model_loader.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(model_loader.ctypes, "WinDLL", lambda value: object())
+
+    with pytest.raises(model_loader.S2RuntimeUnavailable) as exc:
+        model_loader._preload_runtime_dependencies(runtime_dir=runtime_dir, backend="cpu")
+
+    assert "ggml-base.dll" in str(exc.value)
+
+
+def test_preload_runtime_dependencies_reports_missing_cuda_runtime(monkeypatch, tmp_path):
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+
+    for name in ("ggml-base.dll", "ggml.dll", "ggml-cpu.dll", "FishS2Sharp.dll", "ggml-cuda.dll"):
+        (runtime_dir / name).write_bytes(b"x")
+
+    def fake_windll(value: str):
+        if value == "cudart64_12.dll":
+            raise OSError("missing cudart")
+        return object()
+
+    monkeypatch.setattr(model_loader.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(model_loader.ctypes, "WinDLL", fake_windll)
+
+    with pytest.raises(model_loader.S2RuntimeUnavailable) as exc:
+        model_loader._preload_runtime_dependencies(runtime_dir=runtime_dir, backend="cuda")
+
+    assert "cudart64_12.dll" in str(exc.value)

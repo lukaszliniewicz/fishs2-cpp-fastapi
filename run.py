@@ -81,6 +81,7 @@ def _format_bytes(value: int) -> str:
 def _ensure_local_cache_env() -> None:
     os.environ.setdefault("PIP_CACHE_DIR", str(PROJECT_DIR / ".pip-cache"))
     os.environ.setdefault("PIXI_CACHE_DIR", str(PROJECT_DIR / ".pixi-cache"))
+    os.environ.setdefault("RATTLER_CACHE_DIR", str(PROJECT_DIR / ".pixi-cache" / "rattler"))
     os.environ.setdefault("TMP", str(PROJECT_DIR / ".tmp"))
     os.environ.setdefault("TEMP", str(PROJECT_DIR / ".tmp"))
 
@@ -93,6 +94,7 @@ def _ensure_local_cache_env() -> None:
     for directory in (
         Path(os.environ["PIP_CACHE_DIR"]),
         Path(os.environ["PIXI_CACHE_DIR"]),
+        Path(os.environ["RATTLER_CACHE_DIR"]),
         Path(os.environ["TMP"]),
         hf_home,
         hf_hub_cache,
@@ -232,6 +234,7 @@ def _ensure_runtime_bundle(*, force: bool) -> None:
 
     required_files = [
         runtime_dir / "s2.dll",
+        runtime_dir / "ggml-base.dll",
         runtime_dir / "ggml.dll",
         runtime_dir / "ggml-cpu.dll",
         runtime_dir / "ggml-cuda.dll",

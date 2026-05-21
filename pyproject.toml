@@ -38,3 +38,5 @@ check = "python -c \"import importlib.util; print('fishs2_fastapi:', bool(import
 
 [tool.pixi.target.win-64.dependencies]
 cuda-nvcc = "12.8.*"
+cuda-cudart = "12.8.*"
+libcublas = "12.8.*"

@@ -77,6 +77,14 @@ if [ "$CUSTOM_PIXI" -eq 0 ] && [ ! -f "$PIXI_EXE" ]; then
   rm -f "$BIN_DIR/pixi.tar.gz"
 fi
 
+# Set local cache dirs
+export PIXI_CACHE_DIR="$PROJECT_DIR/.pixi-cache"
+export RATTLER_CACHE_DIR="$PROJECT_DIR/.pixi-cache/rattler"
+export PIP_CACHE_DIR="$PROJECT_DIR/.pip-cache"
+export TMP="$PROJECT_DIR/.tmp"
+export TEMP="$PROJECT_DIR/.tmp"
+mkdir -p "$PIXI_CACHE_DIR" "$RATTLER_CACHE_DIR" "$PIP_CACHE_DIR" "$TMP"
+
 # Ensure pixi env is installed
 if [ ! -f "$PROJECT_DIR/.pixi/envs/default/bin/python" ]; then
   echo "Installing pixi environment..."
@@ -86,11 +94,6 @@ elif ! "$PIXI_EXE" install --frozen &>/dev/null; then
   cd "$PROJECT_DIR"
   "$PIXI_EXE" install
 fi
-
-# Set local cache dirs
-export PIXI_CACHE_DIR="$PROJECT_DIR/.pixi-cache"
-export PIP_CACHE_DIR="$PROJECT_DIR/.pip-cache"
-mkdir -p "$PIXI_CACHE_DIR" "$PIP_CACHE_DIR"
 
 # Start bootstrapper
 cd "$PROJECT_DIR"

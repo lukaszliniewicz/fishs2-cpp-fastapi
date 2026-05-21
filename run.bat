@@ -52,6 +52,17 @@ if "%CUSTOM_PIXI%"=="0" if not exist "%PIXI_EXE%" (
     )
 )
 
+:: Set local cache and temp dirs (E: has space, C: may not)
+set "PIXI_CACHE_DIR=%PROJECT_DIR%\.pixi-cache"
+set "RATTLER_CACHE_DIR=%PROJECT_DIR%\.pixi-cache\rattler"
+set "PIP_CACHE_DIR=%PROJECT_DIR%\.pip-cache"
+set "TMP=%PROJECT_DIR%\.tmp"
+set "TEMP=%PROJECT_DIR%\.tmp"
+if not exist "%PIXI_CACHE_DIR%" mkdir "%PIXI_CACHE_DIR%"
+if not exist "%RATTLER_CACHE_DIR%" mkdir "%RATTLER_CACHE_DIR%"
+if not exist "%PIP_CACHE_DIR%" mkdir "%PIP_CACHE_DIR%"
+if not exist "%TMP%" mkdir "%TMP%"
+
 :: Ensure pixi env is installed
 if not exist "%PROJECT_DIR%\.pixi\envs\default\python.exe" (
     echo Installing pixi environment...
@@ -66,15 +77,6 @@ if not exist "%PROJECT_DIR%\.pixi\envs\default\python.exe" (
     cd /d "%PROJECT_DIR%"
     "%PIXI_EXE%" install --frozen >nul 2>&1 || "%PIXI_EXE%" install
 )
-
-:: Set local cache and temp dirs (E: has space, C: may not)
-set "PIXI_CACHE_DIR=%PROJECT_DIR%\.pixi-cache"
-set "PIP_CACHE_DIR=%PROJECT_DIR%\.pip-cache"
-set "TMP=%PROJECT_DIR%\.tmp"
-set "TEMP=%PROJECT_DIR%\.tmp"
-if not exist "%PIXI_CACHE_DIR%" mkdir "%PIXI_CACHE_DIR%"
-if not exist "%PIP_CACHE_DIR%" mkdir "%PIP_CACHE_DIR%"
-if not exist "%TMP%" mkdir "%TMP%"
 
 :: Start bootstrapper
 cd /d "%PROJECT_DIR%"
