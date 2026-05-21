@@ -1,8 +1,16 @@
-# FishS2 FastAPI
+# FishS2 CPP FastAPI
 
 OpenAI-compatible TTS wrapper for **Fish Audio S2 Pro GGUF**, built for Pandrator-style workflows.
 
-This server keeps the same endpoint shape used by our XTTS/Vox wrappers while running inference through `s2.dll` from FishS2Sharp runtime bundles.
+This server keeps the same endpoint shape used by our XTTS/Vox wrappers while running inference through `s2.dll` from FishS2Sharp runtime bundles (which wrap the local `s2.cpp` runtime).
+
+## Upstream Sources
+
+- Fish Audio open-source model/project: `https://github.com/fishaudio/fish-speech`
+- Fish Audio docs: `https://docs.fish.audio`
+- `s2.cpp` local C++ runtime: `https://github.com/rodrigomatta/s2.cpp`
+- FishS2Sharp C# wrapper/runtime bundles: `https://github.com/subspecs/FishS2Sharp`
+- S2 Pro GGUF model variants used by this wrapper: `https://huggingface.co/rodrigomt/s2-pro-gguf`
 
 ## Quick Start
 
@@ -26,13 +34,15 @@ The launcher starts the API at:
 On startup, `run.py` now auto-downloads and keeps everything local:
 
 - FishS2Sharp runtime bundle to `runtime/fishs2sharp/`
-- S2 GGUF model to `models/s2-pro-q8_0.gguf`
+- S2 GGUF model to `models/s2-pro-q8_0.gguf` by default (use `--model-q4` for a smaller `q4_k_m` download)
 - tokenizer to `models/tokenizer.json`
 
 Useful bootstrap flags:
 
 - `--skip-downloads` (offline mode, use existing local files)
 - `--force-downloads` (refresh local artifacts)
+- `--model-q4` (explicit shortcut for `q4_k_m` model download)
+- `--model-quant <quant>` (choose quant: `f16`, `q8_0`, `q6_k`, `q5_k_m`, `q4_k_m`, `q3_k`, `q2_k`)
 - `--n-gpu-layers` (set explicit transformer layer offload count; `-1` keeps runtime default)
 
 You can override artifact paths and sources with env vars:
@@ -48,6 +58,7 @@ You can override artifact paths and sources with env vars:
 - `FISHS2_MODEL_SHA256`
 - `FISHS2_TOKENIZER_SHA256`
 - `FISHS2_HF_REPO_ID` (default: `rodrigomt/s2-pro-gguf`)
+- `FISHS2_MODEL_QUANT` (default: `q8_0`)
 - `FISHS2_SKIP_DOWNLOADS=true`
 - `FISHS2_FORCE_DOWNLOADS=true`
 - `FISHS2_N_GPU_LAYERS` (default: `-1`)

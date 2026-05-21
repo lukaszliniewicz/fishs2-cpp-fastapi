@@ -31,7 +31,17 @@ DEFAULT_RUNTIME_ZIP_URL = (
 )
 DEFAULT_RUNTIME_ZIP_SHA256 = "15c2036ce0a3a5e6d4c8f81a2834e683f7f40a8155179c66858fd27a15d4cc74"
 DEFAULT_HF_REPO = "rodrigomt/s2-pro-gguf"
-DEFAULT_MODEL_FILENAME = "s2-pro-q8_0.gguf"
+DEFAULT_MODEL_QUANT = "q8_0"
+MODEL_QUANT_FILENAMES = {
+    "f16": "s2-pro-f16.gguf",
+    "q8_0": "s2-pro-q8_0.gguf",
+    "q6_k": "s2-pro-q6_k.gguf",
+    "q5_k_m": "s2-pro-q5_k_m.gguf",
+    "q4_k_m": "s2-pro-q4_k_m.gguf",
+    "q3_k": "s2-pro-q3_k.gguf",
+    "q2_k": "s2-pro-q2_k.gguf",
+}
+DEFAULT_MODEL_FILENAME = MODEL_QUANT_FILENAMES[DEFAULT_MODEL_QUANT]
 DEFAULT_TOKENIZER_FILENAME = "tokenizer.json"
 
 PIXI_PATH_OVERRIDE: Path | None = None
@@ -208,6 +218,14 @@ def _hf_resolve_url(repo_id: str, filename: str) -> str:
     return f"https://huggingface.co/{repo_id}/resolve/main/{filename}?download=true"
 
 
+def _resolve_model_quant(raw_value: str | None) -> str:
+    quant = (raw_value or DEFAULT_MODEL_QUANT).strip().lower()
+    if quant not in MODEL_QUANT_FILENAMES:
+        allowed = ", ".join(sorted(MODEL_QUANT_FILENAMES))
+        raise RuntimeError(f"Unsupported model quant '{quant}'. Allowed values: {allowed}")
+    return quant
+
+
 def _ensure_runtime_bundle(*, force: bool) -> None:
     runtime_dir = _resolve_env_path("FISHS2_RUNTIME_DIR", PROJECT_DIR / "runtime" / "fishs2sharp")
     os.environ["FISHS2_RUNTIME_DIR"] = str(runtime_dir)
@@ -257,8 +275,15 @@ def _ensure_runtime_bundle(*, force: bool) -> None:
 
 def _ensure_model_artifacts(*, force: bool) -> None:
     repo_id = (os.environ.get("FISHS2_HF_REPO_ID") or DEFAULT_HF_REPO).strip()
-    model_path = _resolve_env_path("FISHS2_MODEL_PATH", PROJECT_DIR / "models" / DEFAULT_MODEL_FILENAME)
+    selected_quant = _resolve_model_quant(os.environ.get("FISHS2_MODEL_QUANT"))
+    default_model_filename = MODEL_QUANT_FILENAMES[selected_quant]
+    model_path = _resolve_env_path("FISHS2_MODEL_PATH", PROJECT_DIR / "models" / default_model_filename)
     tokenizer_path = _resolve_env_path("FISHS2_TOKENIZER_PATH", PROJECT_DIR / "models" / DEFAULT_TOKENIZER_FILENAME)
+
+    if os.environ.get("FISHS2_MODEL_PATH"):
+        log.info("Using explicit model path from FISHS2_MODEL_PATH: %s", model_path)
+    else:
+        log.info("Selected FishS2 model quant: %s (%s)", selected_quant, model_path.name)
 
     os.environ["FISHS2_MODEL_PATH"] = str(model_path)
     os.environ["FISHS2_TOKENIZER_PATH"] = str(tokenizer_path)
@@ -408,6 +433,19 @@ def main() -> None:
         help="Backend hint for FishS2 runtime (default: cuda)",
     )
     parser.add_argument(
+        "--model-quant",
+        default=os.environ.get("FISHS2_MODEL_QUANT", DEFAULT_MODEL_QUANT),
+        help=(
+            "Model quant variant to download "
+            f"(default: {DEFAULT_MODEL_QUANT}; options: {', '.join(sorted(MODEL_QUANT_FILENAMES))})"
+        ),
+    )
+    parser.add_argument(
+        "--model-q4",
+        action="store_true",
+        help="Shortcut for --model-quant q4_k_m",
+    )
+    parser.add_argument(
         "--n-gpu-layers",
         type=int,
         default=int(os.environ.get("FISHS2_N_GPU_LAYERS", "-1")),
@@ -440,8 +478,16 @@ def main() -> None:
 
     skip_downloads = args.skip_downloads or _bool_env("FISHS2_SKIP_DOWNLOADS", default=False)
     force_downloads = args.force_downloads or _bool_env("FISHS2_FORCE_DOWNLOADS", default=False)
+    requested_quant = "q4_k_m" if args.model_q4 else args.model_quant
+
+    try:
+        selected_quant = _resolve_model_quant(requested_quant)
+    except RuntimeError as exc:
+        log.error(str(exc))
+        sys.exit(1)
 
     os.environ["FISHS2_BACKEND"] = args.backend
+    os.environ["FISHS2_MODEL_QUANT"] = selected_quant
     os.environ["FISHS2_N_GPU_LAYERS"] = str(args.n_gpu_layers)
     ensure_cuda_requirements_or_exit(skip_gpu_check=args.skip_gpu_check, backend=args.backend)
     _ensure_artifacts_or_exit(skip_downloads=skip_downloads, force_downloads=force_downloads)
