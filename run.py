@@ -275,19 +275,30 @@ def _compile_runtime_from_source(backend: str, runtime_dir: Path) -> None:
 
         runtime_dir.mkdir(parents=True, exist_ok=True)
         copied = False
-        lib_ext = "so" if platform.system() != "Darwin" else "dylib"
+        patterns = []
+        if platform.system() == "Windows":
+            patterns = ["s2.dll", "ggml*.dll"]
+        elif platform.system() == "Darwin":
+            patterns = ["libs2*.dylib*", "libggml*.dylib*"]
+        else:
+            patterns = ["libs2*.so*", "libggml*.so*"]
 
-        for pattern in (f"libs2.{lib_ext}", f"libggml*.{lib_ext}"):
+        for pattern in patterns:
             for file_path in build_dir.rglob(pattern):
-                if file_path.is_file() and not file_path.is_symlink():
-                    dest = runtime_dir / file_path.name
-                    log.info("Copying %s -> %s", file_path.name, dest)
+                dest = runtime_dir / file_path.name
+                log.info("Copying %s -> %s", file_path.name, dest)
+                if file_path.is_symlink():
+                    if dest.exists() or dest.is_symlink():
+                        dest.unlink()
+                    shutil.copy(file_path, dest, follow_symlinks=False)
+                else:
                     shutil.copy2(file_path, dest)
-                    copied = True
+                copied = True
 
-        target_lib = runtime_dir / f"libs2.{lib_ext}"
+        lib_name = "s2.dll" if platform.system() == "Windows" else ("libs2.dylib" if platform.system() == "Darwin" else "libs2.so")
+        target_lib = runtime_dir / lib_name
         if not copied or not target_lib.is_file():
-            raise RuntimeError(f"Build completed, but {target_lib.name} was not found in build outputs.")
+            raise RuntimeError(f"Build completed, but {lib_name} was not found in build outputs.")
 
         log.info("Successfully compiled and installed s2.cpp runtime at %s", runtime_dir)
 

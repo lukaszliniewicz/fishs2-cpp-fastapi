@@ -97,4 +97,5 @@ fi
 
 # Start bootstrapper
 cd "$PROJECT_DIR"
+export LD_LIBRARY_PATH="$PROJECT_DIR/runtime/fishs2sharp:${LD_LIBRARY_PATH:-}"
 exec "$PIXI_EXE" run python run.py "${ARGS[@]}"
