@@ -519,7 +519,23 @@ def start_server(*, host: str, port: int) -> None:
 
 
 
+def _load_env_file() -> None:
+    env_path = PROJECT_DIR / ".env"
+    if env_path.is_file():
+        log.info("Loading environment variables from %s", env_path)
+        with env_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip().strip("'\"")
+                os.environ.setdefault(key, val)
+
+
 def main() -> None:
+    _load_env_file()
     _ensure_local_cache_env()
 
     parser = argparse.ArgumentParser(
