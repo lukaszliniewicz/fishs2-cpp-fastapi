@@ -519,6 +519,22 @@ def start_server(*, host: str, port: int) -> None:
 
 
 
+def _resolve_auto_backend() -> str:
+    # 1. Check for NVIDIA GPU
+    nvidia_ok, _ = detect_nvidia_gpu()
+    if nvidia_ok:
+        return "cuda"
+
+    # 2. Check for Vulkan GPU (AMD or Intel)
+    if platform.system() == "Windows":
+        return "vulkan"
+    else:
+        if os.path.exists("/sys/class/drm/card0"):
+            return "vulkan"
+
+    return "cpu"
+
+
 def _load_env_file() -> None:
     env_path = PROJECT_DIR / ".env"
     if env_path.is_file():
@@ -558,9 +574,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=["cuda", "vulkan", "cpu"],
-        default=os.environ.get("FISHS2_BACKEND", "cuda"),
-        help="Backend hint for FishS2 runtime (default: cuda)",
+        choices=["cuda", "vulkan", "cpu", "auto"],
+        default=os.environ.get("FISHS2_BACKEND", "auto"),
+        help="Backend hint for FishS2 runtime (default: auto)",
     )
     parser.add_argument(
         "--model-quant",
@@ -616,10 +632,15 @@ def main() -> None:
         log.error(str(exc))
         sys.exit(1)
 
-    os.environ["FISHS2_BACKEND"] = args.backend
+    backend = args.backend
+    if backend == "auto":
+        backend = _resolve_auto_backend()
+        log.info("Autodetected hardware backend: %s", backend)
+
+    os.environ["FISHS2_BACKEND"] = backend
     os.environ["FISHS2_MODEL_QUANT"] = selected_quant
     os.environ["FISHS2_N_GPU_LAYERS"] = str(args.n_gpu_layers)
-    ensure_cuda_requirements_or_exit(skip_gpu_check=args.skip_gpu_check, backend=args.backend)
+    ensure_cuda_requirements_or_exit(skip_gpu_check=args.skip_gpu_check, backend=backend)
     _ensure_artifacts_or_exit(skip_downloads=skip_downloads, force_downloads=force_downloads)
     start_server(host=args.host, port=args.port)
 
