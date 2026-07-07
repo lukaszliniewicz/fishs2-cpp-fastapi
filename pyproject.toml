@@ -27,9 +27,6 @@ requires-pixi = ">=0.68.0"
 python = "3.12.*"
 pip = "*"
 ffmpeg = "*"
-git = "*"
-git-lfs = "*"
-cmake = "*"
 
 [tool.pixi.pypi-dependencies]
 fishs2-fastapi = { path = ".", editable = true }
@@ -43,3 +40,18 @@ check = "python -c \"import importlib.util; print('fishs2_fastapi:', bool(import
 cuda-nvcc = "12.8.*"
 cuda-cudart = "12.8.*"
 libcublas = "12.8.*"
+
+[tool.pixi.target.linux-64.dependencies]
+git = "*"
+git-lfs = "*"
+cmake = "*"
+
+[tool.pixi.target.osx-64.dependencies]
+git = "*"
+git-lfs = "*"
+cmake = "*"
+
+[tool.pixi.target.osx-arm64.dependencies]
+git = "*"
+git-lfs = "*"
+cmake = "*"
