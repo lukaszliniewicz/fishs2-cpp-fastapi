@@ -232,9 +232,20 @@ def _resolve_model_quant(raw_value: str | None) -> str:
 def _compile_runtime_from_source(backend: str, runtime_dir: Path) -> None:
     log.info("libs2 dynamic library is missing. Starting automated compilation from source...")
 
+    missing = []
     for tool in ("git", "cmake"):
         if shutil.which(tool) is None:
-            raise RuntimeError(f"Required build tool '{tool}' is not installed or not in PATH.")
+            missing.append(tool)
+
+    if missing:
+        msg = (
+            f"Required build tool(s) {', '.join(repr(t) for t in missing)} are not installed or not in PATH.\n\n"
+            "Please install the required compilers and development packages by running:\n"
+            "  - Fedora/RHEL:   sudo dnf install git cmake gcc-c++\n"
+            "  - Ubuntu/Debian:  sudo apt update && sudo apt install git cmake build-essential\n"
+            "  - Arch Linux:     sudo pacman -S git cmake gcc"
+        )
+        raise RuntimeError(msg)
 
     build_root = PROJECT_DIR / ".tmp" / "s2_build"
     if build_root.exists():
