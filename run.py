@@ -256,7 +256,7 @@ def _compile_runtime_from_source(backend: str, runtime_dir: Path) -> None:
         build_dir = s2_dir / "build"
         build_dir.mkdir(exist_ok=True)
 
-        cmake_flags = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"]
+        cmake_flags = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release", "-DS2_BUILD_SHARED_LIBRARIES=ON"]
         if backend == "vulkan":
             cmake_flags.extend(["-DS2_CUDA=OFF", "-DS2_VULKAN=ON"])
         elif backend == "cuda":
