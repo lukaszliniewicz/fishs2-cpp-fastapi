@@ -91,6 +91,7 @@ def _resolve_artifact_path(path: Path, *, label: str) -> Path:
 
 
 def resolve_s2_dll_path() -> Path:
+    lib_name = "s2.dll" if platform.system() == "Windows" else "libs2.so"
     if settings.s2_dll_path is not None:
         explicit = _resolve_path(settings.s2_dll_path)
         if explicit.is_file():
@@ -101,17 +102,18 @@ def resolve_s2_dll_path() -> Path:
         )
 
     runtime_dir = _resolve_path(settings.runtime_dir)
-    if runtime_dir.is_file() and runtime_dir.name.lower() == "s2.dll":
+    if runtime_dir.is_file() and runtime_dir.name.lower() in ("s2.dll", "libs2.so"):
         return runtime_dir
 
-    candidate = runtime_dir / "s2.dll"
+    candidate = runtime_dir / lib_name
     if candidate.is_file():
         return candidate
 
     raise S2RuntimeUnavailable(
-        "s2.dll not found. Extract FishS2Sharp runtime files and set "
+        f"{lib_name} not found. Extract FishS2 runtime files and set "
         "FISHS2_RUNTIME_DIR or FISHS2_S2_DLL_PATH."
     )
+
 
 
 def ensure_nvidia_gpu_available() -> None:

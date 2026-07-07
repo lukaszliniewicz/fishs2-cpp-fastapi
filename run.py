@@ -13,6 +13,7 @@ import sys
 import urllib.error
 import urllib.request
 import zipfile
+import shutil
 from pathlib import Path
 
 logging.basicConfig(
@@ -228,27 +229,103 @@ def _resolve_model_quant(raw_value: str | None) -> str:
     return quant
 
 
+def _compile_runtime_from_source(backend: str, runtime_dir: Path) -> None:
+    log.info("libs2 dynamic library is missing. Starting automated compilation from source...")
+
+    for tool in ("git", "cmake"):
+        if shutil.which(tool) is None:
+            raise RuntimeError(f"Required build tool '{tool}' is not installed or not in PATH.")
+
+    build_root = PROJECT_DIR / ".tmp" / "s2_build"
+    if build_root.exists():
+        try:
+            shutil.rmtree(build_root)
+        except Exception:
+            pass
+    build_root.mkdir(parents=True, exist_ok=True)
+
+    try:
+        log.info("Cloning rodrigomatta/s2.cpp recursively...")
+        subprocess.run(
+            ["git", "clone", "--recursive", "https://github.com/rodrigomatta/s2.cpp", "s2.cpp"],
+            cwd=build_root,
+            check=True,
+        )
+
+        s2_dir = build_root / "s2.cpp"
+        build_dir = s2_dir / "build"
+        build_dir.mkdir(exist_ok=True)
+
+        cmake_flags = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"]
+        if backend == "vulkan":
+            cmake_flags.extend(["-DS2_CUDA=OFF", "-DS2_VULKAN=ON"])
+        elif backend == "cuda":
+            cmake_flags.extend(["-DS2_CUDA=ON", "-DS2_VULKAN=OFF"])
+        else:
+            cmake_flags.extend(["-DS2_CUDA=OFF", "-DS2_VULKAN=OFF"])
+
+        log.info("Configuring CMake: %s", " ".join(cmake_flags))
+        subprocess.run(cmake_flags, cwd=build_dir, check=True)
+
+        import multiprocessing
+        cores = multiprocessing.cpu_count()
+        build_cmd = ["cmake", "--build", ".", "--config", "Release", "-j", str(cores)]
+        log.info("Compiling project: %s", " ".join(build_cmd))
+        subprocess.run(build_cmd, cwd=build_dir, check=True)
+
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        copied = False
+        lib_ext = "so" if platform.system() != "Darwin" else "dylib"
+
+        for pattern in (f"libs2.{lib_ext}", f"libggml*.{lib_ext}"):
+            for file_path in build_dir.rglob(pattern):
+                if file_path.is_file() and not file_path.is_symlink():
+                    dest = runtime_dir / file_path.name
+                    log.info("Copying %s -> %s", file_path.name, dest)
+                    shutil.copy2(file_path, dest)
+                    copied = True
+
+        target_lib = runtime_dir / f"libs2.{lib_ext}"
+        if not copied or not target_lib.is_file():
+            raise RuntimeError(f"Build completed, but {target_lib.name} was not found in build outputs.")
+
+        log.info("Successfully compiled and installed s2.cpp runtime at %s", runtime_dir)
+
+    finally:
+        try:
+            shutil.rmtree(build_root, ignore_errors=True)
+        except Exception:
+            pass
+
+
 def _ensure_runtime_bundle(*, force: bool) -> None:
     runtime_dir = _resolve_env_path("FISHS2_RUNTIME_DIR", PROJECT_DIR / "runtime" / "fishs2sharp")
     os.environ["FISHS2_RUNTIME_DIR"] = str(runtime_dir)
 
-    required_files = [
-        runtime_dir / "s2.dll",
-        runtime_dir / "ggml-base.dll",
-        runtime_dir / "ggml.dll",
-        runtime_dir / "ggml-cpu.dll",
-        runtime_dir / "ggml-cuda.dll",
-        runtime_dir / "FishS2Sharp.dll",
-    ]
-    if not force and all(path.is_file() for path in required_files):
-        log.info("FishS2 runtime already present at %s", runtime_dir)
-        return
+    is_windows = platform.system() == "Windows"
+    lib_name = "s2.dll" if is_windows else ("libs2.dylib" if platform.system() == "Darwin" else "libs2.so")
 
-    if platform.system() != "Windows":
-        raise RuntimeError(
-            "Automatic FishS2 runtime download is currently configured for Windows only. "
-            f"Place runtime DLLs manually in '{runtime_dir}'."
-        )
+    if is_windows:
+        required_files = [
+            runtime_dir / "s2.dll",
+            runtime_dir / "ggml-base.dll",
+            runtime_dir / "ggml.dll",
+            runtime_dir / "ggml-cpu.dll",
+            runtime_dir / "ggml-cuda.dll",
+            runtime_dir / "FishS2Sharp.dll",
+        ]
+        if not force and all(path.is_file() for path in required_files):
+            log.info("FishS2 runtime already present at %s", runtime_dir)
+            return
+    else:
+        if not force and (runtime_dir / lib_name).is_file():
+            log.info("FishS2 runtime already present at %s", runtime_dir)
+            return
+
+    if not is_windows:
+        backend = os.environ.get("FISHS2_BACKEND", "cuda").strip().lower()
+        _compile_runtime_from_source(backend, runtime_dir)
+        return
 
     runtime_zip_path = _resolve_env_path(
         "FISHS2_RUNTIME_ZIP_PATH",
@@ -274,6 +351,7 @@ def _ensure_runtime_bundle(*, force: bool) -> None:
         )
 
     log.info("FishS2 runtime is ready at %s", runtime_dir)
+
 
 
 def _ensure_model_artifacts(*, force: bool) -> None:
@@ -386,6 +464,16 @@ def ensure_cuda_requirements_or_exit(*, skip_gpu_check: bool, backend: str) -> N
 def start_server(*, host: str, port: int) -> None:
     pixi = _find_pixi()
     manifest = PROJECT_DIR / "pyproject.toml"
+
+    env = os.environ.copy()
+    if platform.system() != "Windows":
+        runtime_dir = _resolve_env_path("FISHS2_RUNTIME_DIR", PROJECT_DIR / "runtime" / "fishs2sharp")
+        ld_path = env.get("LD_LIBRARY_PATH", "")
+        if ld_path:
+            env["LD_LIBRARY_PATH"] = f"{runtime_dir}:{ld_path}"
+        else:
+            env["LD_LIBRARY_PATH"] = str(runtime_dir)
+
     cmd = [
         pixi,
         "run",
@@ -404,8 +492,9 @@ def start_server(*, host: str, port: int) -> None:
     log.info("Starting FishS2 FastAPI server...\n")
     sys.stdout.flush()
     sys.stderr.flush()
-    proc = subprocess.run(cmd)
+    proc = subprocess.run(cmd, env=env)
     sys.exit(proc.returncode)
+
 
 
 def main() -> None:
