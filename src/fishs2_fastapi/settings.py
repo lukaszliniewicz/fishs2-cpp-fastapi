@@ -49,7 +49,7 @@ class Settings(BaseSettings):
 
     min_reference_audio_seconds: float = Field(default=0.0, ge=0.0)
 
-    model_config = {"env_prefix": "fishs2_", "env_file": ".env"}
+    model_config = {"env_prefix": "fishs2_", "env_file": ".env", "extra": "ignore"}
 
     @field_validator("model_aliases", mode="before")
     @classmethod
