@@ -120,11 +120,9 @@ class InferenceEngine:
             text = f"({control}){text}"
 
         if request.speed != 1.0:
-            raise APIError(
-                "FishS2 backend does not support speed override; use speed=1.0",
-                param="speed",
-                code="unsupported_speed",
-                status=422,
+            logger.warning(
+                "FishS2 backend does not support speed override; ignoring speed=%s",
+                request.speed,
             )
 
         return text
